@@ -33,11 +33,22 @@ fi
 #check if /etc/rpi-issue exists, if not set the install Args to be false
 if [ -f /etc/rpi-issue ]
 then
+  rpiModel=$(cat /sys/firmware/devicetree/base/model | awk '{print $3}')
+  echo "Detected Raspberry Pi Model $rpiModel"
   installArgs="-DRPI_BUILD=true"
   isRpi=true
 else
   installArgs=""
   isRpi=false
+fi
+
+#check for potential resource limit
+totalMem=$(free -tm | awk '/Total/ {print $2}')
+if [[ $rpiModel -lt 4 && $totalMem -lt 1900 ]]; then
+  echo "Raspberry Pi Model $rpiModel with "$totalMem"MB RAM detected"
+  echo "You may run out of memory while compiling with less than 2GB"
+  echo "Consider raising swap space or compiling on another machine"
+  sleep 5;
 fi
 
 BUILD_TYPE="Release"
@@ -191,6 +202,9 @@ if [ $pulseaudio = false ]
   then
     echo -e skipping pulseaudio '\n'
   else
+    #change to project root
+    cd $script_path
+    
     echo Preparing to compile and install pulseaudio
     echo Grabbing pulseaudio deps
     sudo sed -i 's/#deb-src/deb-src/g' /etc/apt/sources.list
@@ -242,6 +256,9 @@ if [ $bluez = false ]
   then
     echo -e skipping bluez '\n'
   else
+    #change to project root
+    cd $script_path
+
     echo Installing bluez
     sudo apt-get install -y libdbus-1-dev libudev-dev libical-dev libreadline-dev libjson-c-dev
     wget www.kernel.org/pub/linux/bluetooth/bluez-5.63.tar.xz
@@ -258,8 +275,8 @@ fi
 if [ $aasdk = false ]; then
 	echo -e Skipping aasdk '\n'
 else
-  #change to parent directory
-  cd ..
+  #change to project root
+  cd $script_path
 
   #clone aasdk
   git clone $aasdkRepo
@@ -280,6 +297,10 @@ else
   #change into aasdk folder
   echo -e moving to aasdk '\n'
   cd aasdk
+
+  #apply set_FIPS_mode patch
+  echo Apply set_FIPS_mode patch
+  git apply $script_path/patches/aasdk_openssl-fips-fix.patch
 
   #create build directory
   echo Creating aasdk build directory
@@ -303,7 +324,7 @@ else
   fi
 
   #beginning make
-  make -j2
+  make -j4
 
   if [[ $? -eq 0 ]]; then
     echo -e Aasdk Make completed successfully '\n'
@@ -330,10 +351,10 @@ fi
 if [ $h264bitstream = false ]; then
 	echo -e Skipping h264bitstream '\n'
 else
-  #change to parent directory
-  cd ..
+  #change to project root
+  cd $script_path
 
-  #clone aasdk
+  #clone h264bitstream
   git clone $h264bitstreamRepo
   if [[ $? -eq 0 ]]; then
     echo -e h264bitstream Cloned ok '\n'
@@ -374,7 +395,7 @@ else
   fi
 
   #beginning make
-  make
+  make -j4
 
   if [[ $? -eq 0 ]]; then
     echo -e h264bitstream Make completed successfully '\n'
@@ -402,8 +423,8 @@ fi
 if [ $gstreamer = true ]; then
   echo installing gstreamer
 
-  #change to parent directory
-  cd ..
+  #change to project root
+  cd $script_path
 
   #clone gstreamer
   echo Cloning Gstreamer
@@ -434,6 +455,10 @@ if [ $gstreamer = true ]; then
   #apply greenline patch
   echo Apply greenline patch
   git apply $script_path/patches/greenline_fix.patch
+
+  #apply atomic patch
+  echo Apply atomic patch
+  git apply $script_path/patches/qt-gstreamer_atomic-load.patch
 
   #create build directory
   echo Creating Gstreamer build directory
@@ -493,8 +518,11 @@ if [ $openauto = false ]; then
   echo -e skipping openauto'\n'
 else
   echo Installing openauto
-  cd ..
 
+  #change to project root
+  cd $script_path
+
+  #clone openauto
   echo -e cloning openauto'\n'
   git clone $openautoRepo
   if [[ $? -eq 0 ]]; then
@@ -535,7 +563,8 @@ else
   fi
 
   echo Beginning openauto make
-  make
+  make -j4
+
   if [[ $? -eq 0 ]]; then
     echo -e Openauto make OK'\n'
   else
@@ -561,6 +590,9 @@ if [ $dash = false ]; then
 	echo -e Skipping dash'\n'
 else
 
+  #change to project root
+  cd $script_path
+
   #create build directory
   echo Creating dash build directory
   mkdir build
@@ -584,7 +616,8 @@ else
   fi
 
   echo Running Dash make
-  make
+  make -j4
+  
   if [[ $? -eq 0 ]]; then
       echo -e Dash make ok, executable can be found ../bin/dash
       echo
@@ -608,34 +641,21 @@ else
       echo Dash make failed with error code $?
       exit 1
   fi
+  cd ../
 
-  #Setting openGL driver and GPU memory to 128mb
+  #Raspberry Pi addons 
   if $isRpi; then
-    sudo raspi-config nonint do_memory_split 128
-    if [[ $? -eq 0 ]]; then
-      echo -e Memory set to 128mb'\n'
+    read -p "Configure select Raspberry Pi enhancements? (y/N) " choice
+    if [[ $choice == "y" || $choice == "Y" ]]; then
+       ./rpi.sh
+       exit 0
     else
-      echo Setting memory failed with error code $? please set manually
-      exit 1
+       echo "Continuing"
     fi
-
-    sudo raspi-config nonint do_gldriver G2
-    if [[ $? -eq 0 ]]; then
-      echo -e OpenGL set ok'\n'
-    else
-      echo Setting openGL failed with error code $? please set manually
-      exit 1
-    fi
-
-    echo enabling krnbt to speed up boot and improve stability
-    cat <<EOT >> /boot/config.txt
-      dtparam=krnbt
-EOT
   fi
 
 
   #Start app
   echo Starting app
-  cd ../bin
-  ./dash
+  ./bin/dash
 fi
