@@ -164,7 +164,7 @@ const char *Session::System::Brightness::AUTO_PLUGIN = "auto";
 
 Session::System::Brightness::Brightness(QSettings &settings)
     : plugin(settings.value("System/Brightness/plugin", Session::System::Brightness::AUTO_PLUGIN).toString())
-    , value(settings.value("System/Brightness/value", 255).toUInt())
+    , value(settings.value("System/Brightness/value", 180).toUInt())
     , loader_()
 {
     for (const auto file : Session::plugin_dir("brightness").entryInfoList(QDir::Files)) {
@@ -206,7 +206,7 @@ void Session::System::Brightness::set()
 void Session::System::Brightness::reset()
 {
     if (auto plugin = qobject_cast<BrightnessPlugin *>(this->loader_.instance()))
-        plugin->set(255);
+        plugin->set(180);
 }
 
 const QList<QString> &Session::System::Brightness::plugins() const
@@ -313,7 +313,7 @@ QWidget *Session::Forge::brightness_slider(bool buttons) const
 
     auto slider = new QSlider(Qt::Orientation::Horizontal);
     slider->setTracking(false);
-    slider->setRange(76, 255);
+    slider->setRange(20, 180);
     slider->setValue(this->arbiter_.system().brightness.value);
     QObject::connect(slider, &QSlider::sliderReleased, [this, slider]{
         this->arbiter_.set_brightness(slider->sliderPosition());
@@ -324,12 +324,12 @@ QWidget *Session::Forge::brightness_slider(bool buttons) const
         auto dim_button = new QPushButton();
         dim_button->setFlat(true);
         this->iconize("brightness_low", dim_button, 26);
-        QObject::connect(dim_button, &QPushButton::clicked, [this]{ this->arbiter_.decrease_brightness(18); });
+        QObject::connect(dim_button, &QPushButton::clicked, [this]{ this->arbiter_.decrease_brightness(20); });
 
         auto brighten_button = new QPushButton();
         brighten_button->setFlat(true);
         this->iconize("brightness_high", brighten_button, 26);
-        QObject::connect(brighten_button, &QPushButton::clicked, [this]{ this->arbiter_.increase_brightness(18); });
+        QObject::connect(brighten_button, &QPushButton::clicked, [this]{ this->arbiter_.increase_brightness(20); });
 
         layout->addWidget(dim_button);
         layout->addWidget(brighten_button);
