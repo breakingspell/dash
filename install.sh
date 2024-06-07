@@ -22,13 +22,24 @@ display_help() {
     echo
 }
 
-#determine if script is being run on bullseye or above
-BULLSEYE=false
-read -d . DEBIAN_VERSION < /etc/debian_version
-if (( $DEBIAN_VERSION > 10 )); then
-  echo Detected Debian version of Bullseye or above
-  BULLSEYE=true
+# Check OS/Distro
+OS_DISTRO=$(cat /etc/os-release | awk -F '"' '/^PRETTY_NAME/ {print $2}' | cut -d " " -f1)
+if [ $OS_DISTRO = "Debian" ]; then
+  #determine if script is being run on bullseye or above
+  BULLSEYE=false
+  read -d . DEBIAN_VERSION < /etc/debian_version
+  if (( $DEBIAN_VERSION > 10 )); then
+    echo Detected Debian version of Bullseye or above
+    BULLSEYE=true
+  fi
+elif [ $OS_DISTRO = "Ubuntu" ]; then
+  UBUNTU=true
+  echo Detected Ubuntu
+else
+  echo Unsupported OS detected. Halting.
+  exit 1
 fi
+
 
 #check if /etc/rpi-issue exists, if not set the install Args to be false
 if [ -f /etc/rpi-issue ]
@@ -124,7 +135,7 @@ dependencies=(
 "alsa-utils"
 "cmake"
 "libboost-all-dev"
-"libusb-1.0.0-dev"
+"libusb-1.0-0-dev"
 "libssl-dev"
 "libprotobuf-dev"
 "protobuf-c-compiler"
@@ -171,9 +182,18 @@ if [ $deps = false ]
   then
     echo -e skipping dependencies '\n'
   else
-    if [ $BULLSEYE = false ]; then
+    if [ $OS_DISTRO = "Debian" ] && [ $BULLSEYE = false ]; then
       echo Adding qt5-default to dependencies
       dependencies[${#dependencies[@]}]="qt5-default"
+    fi
+    if [ $OS_DISTRO = "Ubuntu" ]; then
+      echo Adding qt5-default replacements to dependencies
+      dependencies+=(
+      "qtbase5-dev"
+      "qtchooser"
+      "qt5-qmake"
+      "qtbase5-dev-tools"
+      )
     fi
     echo installing dependencies
     #loop through dependencies and install
