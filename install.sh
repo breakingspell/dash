@@ -226,28 +226,48 @@ if [ $pulseaudio = false ]
   then
     echo -e skipping pulseaudio '\n'
   else
+    echo Preparing to compile and install custom pulseaudio
+    echo Grabbing pulseaudio deps
+    sudo sed -i 's/# deb-src/deb-src/g' /etc/apt/sources.list
+    sudo apt-get update -y
+    sudo apt-get install -y autopoint
+    sudo apt-get build-dep -y pulseaudio
+
     #change to project root
     cd $script_path
-    
-    echo Preparing to compile and install pulseaudio
-    echo Grabbing pulseaudio deps
-    sudo sed -i 's/#deb-src/deb-src/g' /etc/apt/sources.list
-    sudo apt-get update -y
+
+    #clone pulseaudio
     git clone $pulseaudioRepo
-    sudo apt-get install -y autopoint
-    cd pulseaudio
-    git checkout tags/v12.99.3
+    if [[ $? -eq 0 ]]; then
+      echo -e Pulseaudio Cloned ok '\n'
+    else
+      cd pulseaudio
+      if [[ $? -eq 0 ]]; then
+        git pull $pulseaudioRepo
+        echo -e Pulseaudio Cloned OK '\n'
+        cd ..
+      else
+        echo Pulseaudio clone/pull error
+        exit 1
+      fi
+    fi
+
     echo Applying imtu patch
+    git checkout tags/v12.99.3
     sed -i 's/*imtu = 48;/*imtu = 60;/g' src/modules/bluetooth/backend-native.c
     sed -i 's/*imtu = 48;/*imtu = 60;/g' src/modules/bluetooth/backend-ofono.c
-    sudo apt-get build-dep -y pulseaudio
+
     ./bootstrap.sh
     make -j4
     sudo make install
     sudo ldconfig
+
     # copy configs and force an exit 0 just in case files are identical (we don't care but it will make pimod exit)
-    sudo cp /usr/share/pulseaudio/alsa-mixer/profile-sets/* /usr/local/share/pulseaudio/alsa-mixer/profile-sets/
-    cd ..
+    if [ -f /usr/share/pulseaudio/alsa-mixer/profile-sets ]; then
+      sudo cp /usr/share/pulseaudio/alsa-mixer/profile-sets/* /usr/local/share/pulseaudio/alsa-mixer/profile-sets/
+    fi
+
+    cd $script_path
 fi
 
 
