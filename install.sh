@@ -5,6 +5,7 @@ aasdkRepo="https://github.com/OpenDsh/aasdk"
 gstreamerRepo="https://github.com/GStreamer/qt-gstreamer"
 openautoRepo="https://github.com/openDsh/openauto"
 h264bitstreamRepo="https://github.com/aizvorski/h264bitstream"
+pulseaudioRepo="https://gitlab.freedesktop.org/pulseaudio/pulseaudio.git"
 
 #Help text
 display_help() {
@@ -232,7 +233,7 @@ if [ $pulseaudio = false ]
     echo Grabbing pulseaudio deps
     sudo sed -i 's/#deb-src/deb-src/g' /etc/apt/sources.list
     sudo apt-get update -y
-    git clone git://anongit.freedesktop.org/pulseaudio/pulseaudio
+    git clone $pulseaudioRepo
     sudo apt-get install -y autopoint
     cd pulseaudio
     git checkout tags/v12.99.3
